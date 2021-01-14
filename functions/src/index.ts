@@ -1,6 +1,5 @@
 import * as functions from "firebase-functions"
 
-//const got = require('got')
 // const fetch = require('node-fetch')
 
 // Start writing Firebase Functions
