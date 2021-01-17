@@ -1,32 +1,54 @@
 import * as functions from "firebase-functions"
+import { userDetailsController } from "./controllers/user_details_controller"
 
 const fetch = require('node-fetch')
 
-// Start writing Firebase Functions
-// https://firebase.google.com/docs/functions/typescript
 
-export const helloWorld = functions.https.onRequest(
-  (request: functions.Request, response: functions.Response) => {
-    functions.logger.info(request.query)
+export const userDetails = functions.https.onRequest(userDetailsController)
 
-    let name = request.query.name ?? 'Firebase'
+interface SearchResults {
+  tracks: TracksList
+  error: SearchError
+}
 
-    response.send(`Hello to ${name}!`)
-  }
-)
+interface TracksList {
+  items: Array<TrackItem>
+}
 
-// define what exists in the response
-interface GetCurrentUserResponse {
-  display_name: string
+interface TrackItem {
+  name: string,
+  artists: Array<TrackArtists>,
   id: string
 }
 
-export const userDetails = functions.https.onRequest((request, response) => {
+interface TrackArtists {
+  name: string,
+  id: string
+}
+
+interface SearchError {
+  status: number
+  message: string
+}
+
+
+
+ //return a string of ALL artists' names
+function getArtistsNames(artistsList: Array<TrackArtists>): string {
+  var artists = String("")
+  for(let i=0; i<artistsList.length; i++) {
+    artists += (artistsList[i].name )
+  }
+  return artists
+}
+
+//Firebase function for getting a list of 20 tracks based on keyword
+export const getTracksByKeyword = functions.https.onRequest(async (request, response) => {
   functions.logger.info(request.query)
 
   let accessToken = request.query.token
 
-  fetch('https://api.spotify.com/v1/me', {
+  let result = await fetch('https://api.spotify.com/v1/search?q=rain&type=track&market=NL&limit=20', {
     method: 'GET',
     headers: {
       'Accept': 'application/json',
@@ -34,16 +56,23 @@ export const userDetails = functions.https.onRequest((request, response) => {
       'Authorization': `Bearer ${accessToken}`
     }
   })
-    .then((res: any) => {
-      functions.logger.info(res)
-      return res.json()
-    })
-    .then((json: GetCurrentUserResponse) => {
-      functions.logger.info("Spotify user:")
-      functions.logger.info(json["display_name"])
 
-      response.send({
-        displayName: json.display_name
-      })
-    })
+  let json: SearchResults = await result.json()
+
+  if(json.error) {
+    functions.logger.error(`[${json.error.status}] ${json.error.message}`)
+    return
+  } 
+
+  let output: Array<string> = []
+
+  json.tracks.items.forEach((item: TrackItem) => {
+    functions.logger.debug(
+      item.name, 
+      item.id, 
+      item.artists
+    )
+  })
+  //functions.logger.info(json)
+  response.send(output)
 })
